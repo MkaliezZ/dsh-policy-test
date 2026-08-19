@@ -22,3 +22,21 @@ test('clones args before handing them to evaluator', async () => {
   await runPolicyCases([{ name: 'x', tool: 't', args: original, expect: 'ALLOW' }], (_tool, args: any) => { args.nested.value = 9; return 'ALLOW' })
   assert.equal(original.nested.value, 1)
 })
+
+test('policy-test command evaluates fixtures through the adapter', async () => {
+  const commands: Record<string, (invocation: { rawInput?: string }) => Promise<{ kind: string; text: string }>> = {}
+  const { apply } = await import('../src/index.js')
+  apply({ commands: { register: (d: { name: string; handler: unknown }) => { commands[d.name] = d.handler as never } } }, { evaluate: async () => 'BLOCK' as const })
+  const result = await commands['policy-test']!({ rawInput: JSON.stringify([{ name: 'a', tool: 'bash', args: {}, expect: 'BLOCK' }]) })
+  assert.equal(result.kind, 'success')
+  const parsed = JSON.parse(result.text)
+  assert.equal(parsed.summary.passed, 1)
+})
+
+test('policy-test command reports malformed JSON gracefully', async () => {
+  const commands: Record<string, (invocation: { rawInput?: string }) => Promise<{ kind: string; text: string }>> = {}
+  const { apply } = await import('../src/index.js')
+  apply({ commands: { register: (d: { name: string; handler: unknown }) => { commands[d.name] = d.handler as never } } }, { evaluate: async () => 'ALLOW' as const })
+  const result = await commands['policy-test']!({ rawInput: 'nope' })
+  assert.equal(result.kind, 'error')
+})

@@ -26,8 +26,13 @@ export function apply(ctx: any, config: { evaluate?: PolicyEvaluator } = {}): vo
     recordInput: false,
     async handler(invocation: any) {
       if (!config.evaluate) return { kind: 'error', text: 'policy-test requires an explicit evaluator adapter' }
-      const raw = String(invocation.args?.join(' ') ?? '').trim()
-      const cases = JSON.parse(raw) as PolicyCase[]
+      const raw = String(invocation.rawInput ?? '').trim()
+      let cases: PolicyCase[]
+      try {
+        cases = JSON.parse(raw) as PolicyCase[]
+      } catch {
+        return { kind: 'error', text: 'policy-test expects a JSON array of {name,tool,args,expect} cases' }
+      }
       const results = await runPolicyCases(cases, config.evaluate)
       return { kind: 'success', text: JSON.stringify({ summary: summarizePolicyResults(results), results }, null, 2) }
     },
